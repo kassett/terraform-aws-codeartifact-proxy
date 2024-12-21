@@ -1,4 +1,4 @@
-FROM golang:latest AS base
+FROM golang:1.23.3 AS base
 
 WORKDIR /app
 COPY codeArtifactProxy /app/
