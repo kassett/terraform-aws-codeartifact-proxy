@@ -65,4 +65,4 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
-          repository: ${{ env.IMAGE_NAME }}
+          repository: "kassett247/codeartifact-proxy"
