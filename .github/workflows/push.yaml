@@ -42,9 +42,9 @@ jobs:
       - name: Bump version and push tag
         uses: anothrNick/github-tag-action@1.36.0
         env:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          with-v: true
-          default-bump: patch
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: false
+          DEFAULT_BUMP: patch
 
       - name: Verify Dockerfile
         uses: docker/build-push-action@v5
