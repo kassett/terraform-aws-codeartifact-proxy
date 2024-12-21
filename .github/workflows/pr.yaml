@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Tests
         shell: bash
-        run: ( cd codeArtifactProxy ; go test -v )
+        run: ( cd src ; go test -v )
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,7 +55,7 @@ jobs:
           NEW_VERSION: ${{ steps.tag_version.outputs.new_tag }}
           FILE_PATH: main.tf
         run: |
-          go run replaceVersion.go
+          go run src/utils/replaceVersion.go
 
       - name: Commit Files
         id: commit
