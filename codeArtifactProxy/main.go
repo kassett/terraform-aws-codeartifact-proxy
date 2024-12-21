@@ -145,13 +145,12 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 
 func main() {
 	// Load config
-	var cfg Config
-	_, err := env.UnmarshalFromEnviron(&cfg)
-
+	_, err := env.UnmarshalFromEnviron(&config)
 	if err != nil {
 		log.Fatalf("Failed to load environment variables: %v", err)
 	}
 
+	// Create AWS session
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(config.Region),
 	})
@@ -160,6 +159,7 @@ func main() {
 	}
 	client = codeartifact.New(sess)
 
+	// Initialize token
 	updateAuthToken()
 
 	// Set up periodic token refresh

@@ -26,9 +26,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-#       TODO Add tests
-#      - name: Run Tests
-#        run: go test codeArtifactProxy -v
+      - name: Run Tests
+        shell: bash
+        run: ( cd codeArtifactProxy ; go test -v )
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
