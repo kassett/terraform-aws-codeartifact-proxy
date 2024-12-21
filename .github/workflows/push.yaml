@@ -46,6 +46,12 @@ jobs:
           WITH_V: false
           DEFAULT_BUMP: patch
 
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
       - name: Push docker image
         uses: docker/build-push-action@v5
         with:
