@@ -50,6 +50,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: .
-          provenance: trued
+          provenance: true
           push: true
           tags: "${{ env.IMAGE_NAME }}:latest,${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}"
