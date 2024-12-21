@@ -3,6 +3,7 @@ data "aws_region" "this" {}
 data "aws_caller_identity" "this" {}
 
 locals {
+  TRACKED_GIT_VERSION = "0.1.10"
   region = coalesce(var.codeartifact_region, data.aws_region.this.name)
   account_id = coalesce(var.codeartifact_account_id, data.aws_caller_identity.this.account_id)
 }
