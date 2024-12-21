@@ -65,4 +65,4 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
-          repository: "${{ secrets.DOCKER_USER }}/${{ env.IMAGE_NAME }}"
+          repository: ${{ env.IMAGE_NAME }}
