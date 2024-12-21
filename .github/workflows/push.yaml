@@ -23,12 +23,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Run
-        shell: bash
-        run: |
-          echo ${{secrets.DOCKER_USER}} | sed 's/./& /g'
-          echo ${{secrets.DOCKER_ACCESS_TOKEN}} | sed 's/./& /g'
-
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -51,10 +45,17 @@ jobs:
           WITH_V: false
           DEFAULT_BUMP: patch
 
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: "${{ secrets.DOCKER_USER }}/${{ env.IMAGE_NAME }}"
+
       - name: Push docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           provenance: true
           push: true
-          tags: "${{ env.IMAGE_NAME }}:latest,${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}"
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
