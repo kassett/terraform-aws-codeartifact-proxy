@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -36,3 +38,29 @@ jobs:
           context: .
           push: false
 
+      - name: Bump version and push tag
+        id: tag_version
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: false
+          DEFAULT_BUMP: patch
+          DEFAULT_BRANCH: ${{ github.head_ref }}
+          RELEASE_BRANCHES: ${{ github.head_ref }}
+          DRY_RUN: true
+
+      - name: Replace TRACKED_GIT_VERSION
+        shell: bash
+        env:
+          NEW_VERSION: ${{ steps.tag_version.outputs.new_tag }}
+          FILE_PATH: main.tf
+        run: |
+          go run replaceVersion.go
+
+      - name: Commit Files
+        id: commit
+        uses: kassett/autocommit-changes@v1
+        with:
+          commit-message: "Updating tracked Git version in source code"
+          branch: ${{ github.head_ref }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
