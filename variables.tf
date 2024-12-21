@@ -4,76 +4,92 @@ variable "vpc_id" {
 }
 
 variable "proxy_service_name" {
-  type = string
+  type    = string
   default = "codeartifact-proxy-service"
 }
 
+variable "proxy_task_definition_name" {
+  type    = string
+  default = "codeartifact-proxy-task-definition"
+}
+
 variable "ecs_task_role_prefix" {
-  type = string
+  type    = string
   default = "CodeArtifactProxyTaskRole"
 }
 
-variable "proxy_task_name" {
+variable "log_group_name" {
   type = string
+  default = "/ecs/codeartifact-proxy"
+}
+
+variable "proxy_task_name" {
+  type    = string
   default = "codeartifact-proxy-task"
 }
 
-variable "proxy_port" {
-  type = number
+variable "proxy_container_port" {
+  type    = number
+  default = 5000
+}
+
+variable "proxy_host_port" {
+  type    = number
   default = 5000
 }
 
 variable "username" {
-  type = string
-  default = null
+  type      = string
+  default   = null
   sensitive = true
 }
 
 variable "password" {
-  type = string
-  default = null
+  type      = string
+  default   = null
   sensitive = true
 }
 
 variable "allow_anonymous_access" {
-  type = bool
+  type    = bool
   default = false
 }
 
 variable "proxy_image_tag" {
-  type = string
-  default = "latest"
+  type        = string
+  default     = null
+  description = "If null, defaults to the same tag as the Terraform module version."
 }
 
 variable "create_cluster" {
-  type = bool
-  default = true
+  type        = bool
+  default     = true
   description = "Create a new ECS cluster for the proxy service."
 }
 
 variable "cluster_name" {
-  type = string
+  type    = string
   default = "codeartifact-proxy-cluster"
 }
 
 variable "service_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 
 variable "task_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 
 variable "cluster_tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 
 variable "codeartifact_region" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "If null, defaults to this region."
 }
 
@@ -86,28 +102,28 @@ variable "codeartifact_repository" {
 }
 
 variable "codeartifact_account_id" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "If null, defaults to the account ID of the current user."
 }
 
 variable "task_cpu" {
-  type = number
+  type    = number
   default = 256
 }
 
 variable "task_memory" {
-  type = number
+  type    = number
   default = 512
 }
 
 variable "task_replicas" {
-  type = number
+  type    = number
   default = 1
 }
 
 variable "code_artifact_policy" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "Defaults to full access for the designated domain and repository."
 }

@@ -55,7 +55,7 @@ jobs:
           NEW_VERSION: ${{ steps.tag_version.outputs.new_tag }}
           FILE_PATH: main.tf
         run: |
-          go run replaceVersion.go
+          go run src/replaceVersion.go
 
       - name: Commit Files
         id: commit

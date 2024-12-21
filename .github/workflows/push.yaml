@@ -45,42 +45,6 @@ jobs:
           WITH_V: false
           DEFAULT_BUMP: patch
 
-      - name: Replace TRACKED_GIT_VERSION
-        shell: bash
-        env:
-          NEW_VERSION: ${{ steps.tag_version.outputs.new_tag }}
-          FILE_PATH: main.tf
-        run: |
-          cat <<EOF > replace_version.go
-          package main
-          
-          import (
-              "os"
-              "regexp"
-              "io/ioutil"
-              "log"
-          )
-          
-          func main() {
-              newVersion := os.Getenv("NEW_VERSION")
-              filePath := os.Getenv("FILE_PATH")
-              if newVersion == "" || filePath == "" {
-                  log.Fatal("Environment variables NEW_VERSION and FILE_PATH must be set")
-              }
-              content, err := ioutil.ReadFile(filePath)
-              if err != nil {
-                  log.Fatalf("Error reading file: %v", err)
-              }
-              re := regexp.MustCompile(`(TRACKED_GIT_VERSION\\s*=\\s*")([^"]*)(")`)
-              updatedContent := re.ReplaceAllString(string(content), `$1`+newVersion+`$3`)
-              if err = ioutil.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
-                  log.Fatalf("Error writing to file: %v", err)
-              }
-          }
-          EOF
-          
-          go run replace_version.go
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4

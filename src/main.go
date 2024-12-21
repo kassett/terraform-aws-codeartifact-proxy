@@ -21,8 +21,8 @@ type Config struct {
 	AccountId      string `env:"PROXY_ACCOUNT_ID,required=true"`
 	Domain         string `env:"PROXY_DOMAIN,required=true"`
 	Repository     string `env:"PROXY_REPOSITORY,required=true"`
-	Username       string `env:"ProxyUsername"`
-	Password       string `env:"ProxyPassword"`
+	Username       string `env:"PROXY_USERNAME"`
+	Password       string `env:"PROXY_PASSWORD"`
 	AllowAnonymous bool   `env:"PROXY_ALLOW_ANONYMOUS"`
 	ServerPort     string `env:"PROXY_SERVER_PORT,default=5000"`
 }
