@@ -36,6 +36,6 @@ jobs:
       - name: Verify Dockerfile
         uses: docker/build-push-action@v5
         with:
-          context: codeArtifactProxy
+          context: ./codeArtifactProxy
           push: false
 
