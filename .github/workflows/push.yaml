@@ -1,0 +1,62 @@
+name: Merge to main
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: codeartifact-proxy
+
+jobs:
+  merge:
+    name: Merge to main
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Bump version and push tag
+        id: tag_version
+        uses: miguelfito/github-bump-and-tag-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: 'patch'
+
+      - name: Verify Dockerfile
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: "latest,${{ steps.tag_version.outputs.new_tag }}"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
