@@ -11,36 +11,56 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 }
 
 data "aws_iam_policy_document" "ecs_task_allow" {
-  statement = {
+  statement {
     effect  = "Allow"
     actions = ["codeartifact:*"]
     resources = [
-      "arn:aws:codeartifact:${local.region}:${local.account_id}:repository/${var.codeartifact_domain}/${var.codeartifact_repository}",
-      "arn:aws:codeartifact:${local.region}:${local.account_id}:repository/${var.codeartifact_domain}/${var.codeartifact_repository}/*"
+      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}",
+      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}/*"
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "ecs_logging_permissions" {
+  statement {
+    effect    = "Allow"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["*"]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:DescribeLogStreams",
+      "logs:PutLogEvents",
+    ]
+    resources = [
+      aws_cloudwatch_log_group.lg.arn,
     ]
   }
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
-  name_prefix        = var.ecs_task_role_prefix
-  assume_role_policy = data.aws_iam_policy
+  name_prefix        = var.names.role_prefix
+  assume_role_policy = data.aws_iam_policy_document.ecs_tasks_assume.json
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  ]
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_tailscale" {
-  role       = aws_iam_role.ecs_task_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+resource "aws_iam_role_policy" "logging_permissions" {
+  role = aws_iam_role.ecs_task_execution.id
+  policy = data.aws_iam_policy_document.ecs_logging_permissions.json
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_internal_policy" {
   count       = var.code_artifact_policy == null ? 0 : 1
-  name_prefix = "${var.ecs_task_role_prefix}Policy"
   role        = aws_iam_role.ecs_task_execution.id
   policy      = data.aws_iam_policy_document.ecs_task_allow.json
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_external_policy" {
-  count       = var.code_artifact_policy == null ? 1 : 0
-  name_prefix = "${var.ecs_task_role_prefix}Policy"
+  count       = var.code_artifact_policy != null ? 1 : 0
   role        = aws_iam_role.ecs_task_execution.id
   policy      = var.code_artifact_policy
 }
