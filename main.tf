@@ -3,7 +3,7 @@ data "aws_region" "this" {}
 data "aws_caller_identity" "this" {}
 
 locals {
-  TRACKED_GIT_VERSION = "0.1.24"
+  TRACKED_GIT_VERSION = "0.1.25"
 
   codeartifact_region     = coalesce(var.repository_settings.region, data.aws_region.this.name)
   codeartifact_account_id = coalesce(var.repository_settings.account_id, data.aws_caller_identity.this.account_id)
@@ -110,8 +110,11 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "PROXY_SERVER_PORT"
           value = tostring(var.networking.container_port)
-        }
-        ], var.authentication.allow_anonymous ? [] : [
+        },
+        {
+          name  = "PROXY_HEALTH_CHECK_PATH"
+          value = var.networking.health_check.path
+        }], var.authentication.allow_anonymous ? [] : [
         {
           name  = "PROXY_SECRET_ID"
           value = try(aws_secretsmanager_secret.auth[0].id)
@@ -182,7 +185,7 @@ resource "aws_lb_target_group" "this" {
   target_type = "ip"
 
   health_check {
-    path                = "/"
+    path                = var.networking.health_check.path
     interval            = var.networking.health_check.interval
     timeout             = var.networking.health_check.timeout
     healthy_threshold   = var.networking.health_check.healthy_threshold
@@ -220,15 +223,25 @@ resource "aws_acm_certificate" "this" {
   validation_method = "DNS"
 }
 
+resource "null_resource" "wait_for_certificate" {
+  depends_on = [aws_acm_certificate.this]
+}
+
 resource "aws_route53_record" "cert_validation" {
-  # To do -- fix for no hosting
-  for_each = { for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.domain_name => dvo }
+  for_each = {
+    for dvo in coalesce(
+      try(aws_acm_certificate.this[0].domain_validation_options, []),
+      []
+    ) : dvo.domain_name => dvo
+  }
 
   zone_id = data.aws_route53_zone.this[0].zone_id
   name    = each.value.resource_record_name
   type    = each.value.resource_record_type
   ttl     = 300
   records = [each.value.resource_record_value]
+
+  depends_on = [null_resource.wait_for_certificate]
 }
 
 resource "aws_acm_certificate_validation" "this" {
@@ -252,101 +265,3 @@ resource "aws_lb_listener" "this" {
     target_group_arn = aws_lb_target_group.this[0].arn
   }
 }
-
-
-
-
-
-
-
-
-# }
-#
-# resource "aws_lb" "this" {
-#   count              = var.hosting != null ? 1 : 0
-#   name               = var.names.load_balancer
-#   internal           = true
-#   load_balancer_type = "application"
-#   security_groups    = local.security_groups
-#   subnets            = var.networking.subnets
-# }
-#
-# resource "aws_lb_target_group" "this" {
-#   count       = var.hosting != null ? 1 : 0
-#   name        = var.names.load_balancer_target_group
-#   port        = 443
-#   target_type = "ip"
-#   protocol    = "HTTPS"
-#   vpc_id      = var.networking.vpc_id
-# }
-#
-# resource "aws_lb_listener" "this" {
-#   count             = var.hosting != null ? 1 : 0
-#   load_balancer_arn = aws_lb.this[0].arn
-#   port              = 443
-#   protocol          = "HTTPS"
-#   ssl_policy        = var.hosting.ssl_policy
-#   certificate_arn   = aws_acm_certificate.this[0].arn
-#
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.this[0].arn
-#   }
-# }
-#
-# data "aws_route53_zone" "this" {
-#   count = var.hosting != null ? 1 : 0
-#   name  = var.hosting.zone_name
-# }
-#
-# resource "aws_route53_record" "this" {
-#   count = var.hosting != null ? 1 : 0
-#   name  = var.hosting.record_name
-#   type  = "CNAME"
-#
-#   records = [
-#     aws_lb.this[0].dns_name,
-#   ]
-#
-#   zone_id = data.aws_route53_zone.this[0].zone_id
-#   ttl     = tostring(var.hosting.dns_ttl)
-# }
-#
-# resource "aws_acm_certificate" "this" {
-#   count = var.hosting != null ? 1 : 0
-#
-#   domain_name       = "${var.hosting.record_name}.${var.hosting.zone_name}"
-#   validation_method = "DNS"
-#
-#   lifecycle {
-#     create_before_destroy = true
-#   }
-# }
-#
-# resource "aws_route53_record" "web_cert_validation" {
-#   count = var.hosting != null ? 1 : 0
-#
-#   zone_id = data.aws_route53_zone.this[0].zone_id
-#   ttl     = tostring(var.hosting.dns_ttl)
-#
-#   name    = tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_name
-#   type    = tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_type
-#   records = [tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_value]
-#
-#   lifecycle {
-#     create_before_destroy = true
-#   }
-# }
-#
-# resource "aws_acm_certificate_validation" "this" {
-#   count = var.hosting != null ? 1 : 0
-#
-#   certificate_arn         = aws_acm_certificate.this[0].arn
-#   validation_record_fqdns = [aws_route53_record.web_cert_validation[0].fqdn]
-#
-#   lifecycle {
-#     create_before_destroy = true
-#   }
-#
-#   depends_on = [aws_route53_record.web_cert_validation]
-# }
