@@ -12,12 +12,36 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 
 data "aws_iam_policy_document" "ecs_task_allow" {
   statement {
-    effect  = "Allow"
-    actions = ["codeartifact:*"]
+    effect = "Allow"
+    sid    = "AccessToCodeArtifactRepository"
+    actions = [
+      "codeartifact:*",
+    ]
     resources = [
       "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}",
       "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}/*"
     ]
+  }
+
+  statement {
+    effect  = "Allow"
+    sid     = "AccessToCreateAuthToken"
+    actions = ["codeartifact:GetAuthorizationToken"]
+    resources = [
+      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:domain/${var.repository_settings.domain}",
+    ]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["sts:GetServiceBearerToken"]
+    sid       = "AccessToCreateBearerToken"
+    condition {
+      test     = "StringEquals"
+      values   = ["codeartifact.amazonaws.com"]
+      variable = "sts:AWSServiceName"
+    }
   }
 }
 
@@ -36,6 +60,7 @@ data "aws_iam_policy_document" "ecs_logging_permissions" {
     ]
     resources = [
       aws_cloudwatch_log_group.lg.arn,
+      "${aws_cloudwatch_log_group.lg.arn}/*"
     ]
   }
 }
@@ -54,7 +79,7 @@ resource "aws_iam_role_policy" "logging_permissions" {
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_internal_policy" {
-  count  = var.code_artifact_policy == null ? 0 : 1
+  count  = var.code_artifact_policy == null ? 1 : 0
   role   = aws_iam_role.ecs_task_execution.id
   policy = data.aws_iam_policy_document.ecs_task_allow.json
 }
