@@ -51,7 +51,9 @@ jobs:
         with:
           images: "${{ secrets.DOCKER_USER }}/${{ env.IMAGE_NAME }}"
           sep-tags: ","
-          tags: "latest,${{ steps.tag_version.outputs.new_tag }}"
+          tags: |
+            latest
+            ${{ steps.tag_version.outputs.new_tag }}
 
       - name: Push docker image
         uses: docker/build-push-action@v5
