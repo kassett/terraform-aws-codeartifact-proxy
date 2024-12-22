@@ -19,13 +19,14 @@ import (
 )
 
 type Config struct {
-	Region         string `env:"PROXY_REGION,required=true"`
-	AccountId      string `env:"PROXY_ACCOUNT_ID,required=true"`
-	Domain         string `env:"PROXY_DOMAIN,required=true"`
-	Repository     string `env:"PROXY_REPOSITORY,required=true"`
-	SecretId       string `env:"PROXY_SECRET_ID"`
-	AllowAnonymous bool   `env:"PROXY_ALLOW_ANONYMOUS"`
-	ServerPort     string `env:"PROXY_SERVER_PORT,default=5000"`
+	Region          string `env:"PROXY_REGION,required=true"`
+	AccountId       string `env:"PROXY_ACCOUNT_ID,required=true"`
+	Domain          string `env:"PROXY_DOMAIN,required=true"`
+	Repository      string `env:"PROXY_REPOSITORY,required=true"`
+	SecretId        string `env:"PROXY_SECRET_ID"`
+	AllowAnonymous  bool   `env:"PROXY_ALLOW_ANONYMOUS"`
+	ServerPort      string `env:"PROXY_SERVER_PORT,default=5000"`
+	HealthCheckPath string `env:"PROXY_HEALTH_CHECK_PATH,default=/health"`
 }
 
 var (
@@ -118,19 +119,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
-		}(resp.Body)
+		defer resp.Body.Close()
 		w.WriteHeader(resp.StatusCode)
 		_, err = io.Copy(w, resp.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
-
 	case http.MethodPost:
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -142,19 +136,12 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
-		}(resp.Body)
+		defer resp.Body.Close()
 		w.WriteHeader(resp.StatusCode)
 		_, err = io.Copy(w, resp.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
-
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -178,6 +165,11 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func healthCheckHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
 func main() {
@@ -212,12 +204,13 @@ func main() {
 
 	// Set up routes
 	r := mux.NewRouter()
-	r.HandleFunc("/{path:.*}", proxyHandler).Methods(http.MethodGet, http.MethodPost)
+	r.HandleFunc(config.HealthCheckPath, healthCheckHandler).Methods(http.MethodGet) // Unauthenticated route
 
-	// Add Basic Auth if required
-	handler := basicAuthMiddleware(r)
+	authenticatedRoutes := r.PathPrefix("/").Subrouter()
+	authenticatedRoutes.HandleFunc("/{path:.*}", proxyHandler).Methods(http.MethodGet, http.MethodPost)
+	r.PathPrefix("/").Handler(basicAuthMiddleware(authenticatedRoutes)) // Authenticated routes
 
 	// Start server
 	log.Printf("Server starting on port %s\n", config.ServerPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", config.ServerPort), handler))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", config.ServerPort), r))
 }

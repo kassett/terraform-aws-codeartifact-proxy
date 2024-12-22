@@ -4,7 +4,6 @@ variable "networking" {
     vpc_id                 = string
     subnets                = list(string)
     security_groups        = optional(list(string), [])
-    host_port              = optional(number, 80)
     container_port         = optional(number, 5000)
     external_load_balancer = optional(bool, true)
     health_check = optional(object({
@@ -45,6 +44,7 @@ variable "tags" {
     service                    = optional(map(string))
     cluster                    = optional(map(string))
     role                       = optional(map(string))
+    certificate                = optional(map(string))
     secret                     = optional(map(string))
     task_definition            = optional(map(string))
     security_group             = optional(map(string))
@@ -97,3 +97,12 @@ variable "image_tag" {
   description = "Defaults to the same tag version as the Terraform module."
 }
 
+variable "hosting" {
+  type = object({
+    zone_name   = string
+    record_name = string
+    dns_ttl     = optional(number, 60)
+    ssl_policy  = optional(string, "ELBSecurityPolicy-TLS13-1-2-2021-06")
+  })
+  default = null
+}
