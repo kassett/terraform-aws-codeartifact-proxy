@@ -49,18 +49,18 @@ resource "aws_iam_role" "ecs_task_execution" {
 }
 
 resource "aws_iam_role_policy" "logging_permissions" {
-  role = aws_iam_role.ecs_task_execution.id
+  role   = aws_iam_role.ecs_task_execution.id
   policy = data.aws_iam_policy_document.ecs_logging_permissions.json
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_internal_policy" {
-  count       = var.code_artifact_policy == null ? 0 : 1
-  role        = aws_iam_role.ecs_task_execution.id
-  policy      = data.aws_iam_policy_document.ecs_task_allow.json
+  count  = var.code_artifact_policy == null ? 0 : 1
+  role   = aws_iam_role.ecs_task_execution.id
+  policy = data.aws_iam_policy_document.ecs_task_allow.json
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_external_policy" {
-  count       = var.code_artifact_policy != null ? 1 : 0
-  role        = aws_iam_role.ecs_task_execution.id
-  policy      = var.code_artifact_policy
+  count  = var.code_artifact_policy != null ? 1 : 0
+  role   = aws_iam_role.ecs_task_execution.id
+  policy = var.code_artifact_policy
 }

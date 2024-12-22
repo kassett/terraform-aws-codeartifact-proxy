@@ -45,6 +45,11 @@ jobs:
           WITH_V: false
           DEFAULT_BUMP: patch
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,amd64
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -60,6 +65,7 @@ jobs:
         with:
           context: .
           provenance: true
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
