@@ -38,6 +38,8 @@ jobs:
           context: .
           push: false
           platforms: linux/amd64,linux/arm64,linux/arm/v7
+          cache-to: "gha"
+          cache-from: "gha"
 
       - name: Bump version and push tag
         id: tag_version

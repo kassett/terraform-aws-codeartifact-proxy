@@ -64,6 +64,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: "gha"
+          cache-to: "gha"
 
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v4
