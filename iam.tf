@@ -32,6 +32,18 @@ data "aws_iam_policy_document" "ecs_task_allow" {
     ]
   }
 
+  dynamic "statement" {
+    for_each = var.authentication.allow_anonymous ? [] : toset([0])
+    content {
+      effect  = "Allow"
+      sid     = "AccessSecret"
+      actions = ["secretsmanager:GetSecretValue"]
+      resources = [
+        aws_secretsmanager_secret.auth[0].arn
+      ]
+    }
+  }
+
   statement {
     effect    = "Allow"
     resources = ["*"]

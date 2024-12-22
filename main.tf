@@ -3,7 +3,7 @@ data "aws_region" "this" {}
 data "aws_caller_identity" "this" {}
 
 locals {
-  TRACKED_GIT_VERSION = "0.1.23"
+  TRACKED_GIT_VERSION = "0.1.24"
 
   codeartifact_region     = coalesce(var.repository_settings.region, data.aws_region.this.name)
   codeartifact_account_id = coalesce(var.repository_settings.account_id, data.aws_caller_identity.this.account_id)
@@ -75,7 +75,7 @@ resource "aws_ecs_task_definition" "this" {
         {
           containerPort = var.networking.container_port
           hostPort      = var.networking.container_port
-          protocol      = "HTTP"
+          protocol      = "tcp"
         },
       ],
       logConfiguration = {
@@ -127,7 +127,7 @@ resource "aws_ecs_service" "this" {
   cluster               = var.names.cluster
   task_definition       = aws_ecs_task_definition.this.arn
   desired_count         = var.replicas
-  wait_for_steady_state = true
+  wait_for_steady_state = false
   launch_type           = "FARGATE"
 
   deployment_circuit_breaker {
@@ -145,10 +145,13 @@ resource "aws_ecs_service" "this" {
     subnets          = var.networking.subnets
   }
 
-  load_balancer {
-    container_name   = local.image_name
-    container_port   = var.networking.container_port
-    target_group_arn = aws_lb_target_group.this.arn
+  dynamic "load_balancer" {
+    for_each = var.hosting != null ? [1] : []
+    content {
+      container_name   = local.image_name
+      container_port   = var.networking.container_port
+      target_group_arn = aws_lb_target_group.this[0].arn
+    }
   }
 
   tags       = var.tags.service
@@ -156,19 +159,28 @@ resource "aws_ecs_service" "this" {
 }
 
 resource "aws_lb" "this" {
+  count = var.hosting != null ? 1 : 0
+
   name               = var.names.load_balancer
   internal           = true
   load_balancer_type = "application"
   security_groups    = local.security_groups
   subnets            = var.networking.subnets
+
+  tags = merge({
+    Name = var.names.load_balancer
+  }, coalesce(var.tags.load_balancer, {}))
 }
 
 resource "aws_lb_target_group" "this" {
+  count = var.hosting != null ? 1 : 0
+
   name        = var.names.load_balancer_target_group
-  port        = var.networking.host_port
+  port        = var.networking.container_port
   protocol    = "HTTP"
   vpc_id      = var.networking.vpc_id
   target_type = "ip"
+
   health_check {
     path                = "/"
     interval            = var.networking.health_check.interval
@@ -176,15 +188,165 @@ resource "aws_lb_target_group" "this" {
     healthy_threshold   = var.networking.health_check.healthy_threshold
     unhealthy_threshold = var.networking.health_check.unhealthy_threshold
   }
+
+  tags = merge({
+    Name = var.names.load_balancer_target_group
+  }, coalesce(var.tags.load_balancer_target_group, {}))
+}
+
+data "aws_route53_zone" "this" {
+  count = var.hosting != null ? 1 : 0
+  name  = var.hosting.zone_name
+}
+
+resource "aws_route53_record" "this" {
+  count = var.hosting != null ? 1 : 0
+
+  zone_id = data.aws_route53_zone.this[0].zone_id
+  name    = "${var.hosting.record_name}.${var.hosting.zone_name}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.this[0].dns_name
+    zone_id                = aws_lb.this[0].zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_acm_certificate" "this" {
+  count = var.hosting != null ? 1 : 0
+
+  domain_name       = "${var.hosting.record_name}.${var.hosting.zone_name}"
+  validation_method = "DNS"
+}
+
+resource "aws_route53_record" "cert_validation" {
+  # To do -- fix for no hosting
+  for_each = { for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.domain_name => dvo }
+
+  zone_id = data.aws_route53_zone.this[0].zone_id
+  name    = each.value.resource_record_name
+  type    = each.value.resource_record_type
+  ttl     = 300
+  records = [each.value.resource_record_value]
+}
+
+resource "aws_acm_certificate_validation" "this" {
+  count = var.hosting != null ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.this[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
 resource "aws_lb_listener" "this" {
-  load_balancer_arn = aws_lb.this.arn
-  port              = var.networking.host_port
-  protocol          = "HTTP"
+  count = var.hosting != null ? 1 : 0
+
+  load_balancer_arn = aws_lb.this[0].arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = var.hosting.ssl_policy
+  certificate_arn   = aws_acm_certificate_validation.this[0].certificate_arn
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.this.arn
+    target_group_arn = aws_lb_target_group.this[0].arn
   }
 }
+
+
+
+
+
+
+
+
+# }
+#
+# resource "aws_lb" "this" {
+#   count              = var.hosting != null ? 1 : 0
+#   name               = var.names.load_balancer
+#   internal           = true
+#   load_balancer_type = "application"
+#   security_groups    = local.security_groups
+#   subnets            = var.networking.subnets
+# }
+#
+# resource "aws_lb_target_group" "this" {
+#   count       = var.hosting != null ? 1 : 0
+#   name        = var.names.load_balancer_target_group
+#   port        = 443
+#   target_type = "ip"
+#   protocol    = "HTTPS"
+#   vpc_id      = var.networking.vpc_id
+# }
+#
+# resource "aws_lb_listener" "this" {
+#   count             = var.hosting != null ? 1 : 0
+#   load_balancer_arn = aws_lb.this[0].arn
+#   port              = 443
+#   protocol          = "HTTPS"
+#   ssl_policy        = var.hosting.ssl_policy
+#   certificate_arn   = aws_acm_certificate.this[0].arn
+#
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.this[0].arn
+#   }
+# }
+#
+# data "aws_route53_zone" "this" {
+#   count = var.hosting != null ? 1 : 0
+#   name  = var.hosting.zone_name
+# }
+#
+# resource "aws_route53_record" "this" {
+#   count = var.hosting != null ? 1 : 0
+#   name  = var.hosting.record_name
+#   type  = "CNAME"
+#
+#   records = [
+#     aws_lb.this[0].dns_name,
+#   ]
+#
+#   zone_id = data.aws_route53_zone.this[0].zone_id
+#   ttl     = tostring(var.hosting.dns_ttl)
+# }
+#
+# resource "aws_acm_certificate" "this" {
+#   count = var.hosting != null ? 1 : 0
+#
+#   domain_name       = "${var.hosting.record_name}.${var.hosting.zone_name}"
+#   validation_method = "DNS"
+#
+#   lifecycle {
+#     create_before_destroy = true
+#   }
+# }
+#
+# resource "aws_route53_record" "web_cert_validation" {
+#   count = var.hosting != null ? 1 : 0
+#
+#   zone_id = data.aws_route53_zone.this[0].zone_id
+#   ttl     = tostring(var.hosting.dns_ttl)
+#
+#   name    = tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_name
+#   type    = tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_type
+#   records = [tolist(aws_acm_certificate.this[0].domain_validation_options)[0].resource_record_value]
+#
+#   lifecycle {
+#     create_before_destroy = true
+#   }
+# }
+#
+# resource "aws_acm_certificate_validation" "this" {
+#   count = var.hosting != null ? 1 : 0
+#
+#   certificate_arn         = aws_acm_certificate.this[0].arn
+#   validation_record_fqdns = [aws_route53_record.web_cert_validation[0].fqdn]
+#
+#   lifecycle {
+#     create_before_destroy = true
+#   }
+#
+#   depends_on = [aws_route53_record.web_cert_validation]
+# }
