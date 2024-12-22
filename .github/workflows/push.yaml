@@ -45,6 +45,11 @@ jobs:
           WITH_V: false
           DEFAULT_BUMP: patch
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,amd64
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
@@ -64,8 +69,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: "gha"
-          cache-to: "gha"
 
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v4
