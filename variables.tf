@@ -6,7 +6,9 @@ variable "networking" {
     security_groups        = optional(list(string), [])
     container_port         = optional(number, 5000)
     external_load_balancer = optional(bool, true)
+
     health_check = optional(object({
+      path                = optional(string, "/health")
       interval            = optional(number, 30)
       timeout             = optional(number, 5)
       healthy_threshold   = optional(number, 5)
@@ -85,7 +87,7 @@ variable "replicas" {
   default = 1
 }
 
-variable "code_artifact_policy" {
+variable "codeartifact_policy" {
   type        = string
   default     = null
   description = "Defaults to full access for the designated domain and repository."
