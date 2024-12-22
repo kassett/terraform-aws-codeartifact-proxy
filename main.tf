@@ -25,6 +25,14 @@ resource "aws_security_group" "sg" {
   description = "Default security group created to give access to the CodeArtifact Proxy."
 }
 
+resource "aws_vpc_security_group_egress_rule" "internet_access" {
+  count             = length(var.networking.security_groups) == 0 ? 1 : 0
+  security_group_id = aws_security_group.sg[0].id
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "Internet access for pulling image and artifacts."
+  ip_protocol       = "-1"
+}
+
 locals {
   security_groups = length(var.networking.security_groups) > 0 ? var.networking.security_groups : [try(aws_security_group.sg[0].id)]
 }
@@ -37,8 +45,8 @@ resource "aws_ecs_task_definition" "this" {
   family                   = var.names.task_definition
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task_execution.arn
 
@@ -47,6 +55,8 @@ resource "aws_ecs_task_definition" "this" {
       name      = local.image_name,
       image     = "${local.image_repository}/${local.image_name}:${local.image_tag}",
       essential = true,
+      cpu       = var.task_cpu
+      memory    = var.task_memory
       portMappings = [
         {
           containerPort = var.networking.container_port
@@ -57,7 +67,7 @@ resource "aws_ecs_task_definition" "this" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          "awslogs-group"         = var.names.log_group
+          "awslogs-group"         = aws_cloudwatch_log_group.lg.name
           "awslogs-region"        = data.aws_region.this.name
           "awslogs-stream-prefix" = "ecs"
         }
