@@ -1,22 +1,33 @@
 
 variable "networking" {
   type = object({
-    vpc_id          = string
-    subnets         = list(string)
-    security_groups = optional(list(string), [])
-    host_port       = optional(number, 5000)
-    container_port  = optional(number, 5000)
+    vpc_id                 = string
+    subnets                = list(string)
+    security_groups        = optional(list(string), [])
+    host_port              = optional(number, 80)
+    container_port         = optional(number, 5000)
+    external_load_balancer = optional(bool, true)
+    health_check = optional(object({
+      interval            = optional(number, 30)
+      timeout             = optional(number, 5)
+      healthy_threshold   = optional(number, 5)
+      unhealthy_threshold = optional(number, 2)
+    }), {})
   })
 }
 
 variable "names" {
   type = object({
-    service               = optional(string, "codeartifact-proxy-service")
-    security_group_prefix = optional(string, "codeartifact-proxy-security-group")
-    cluster               = optional(string, "codeartifact-proxy-cluster")
-    role_prefix           = optional(string, "CodeArtifactProxyRole")
-    task_definition       = optional(string, "codeartifact-proxy-task-definition")
-    log_group             = optional(string, "/ecs/codeartifact-proxy")
+    service                    = optional(string, "codeartifact-proxy-service")
+    security_group_prefix      = optional(string, "codeartifact-proxy-security-group")
+    cluster                    = optional(string, "codeartifact-proxy-cluster")
+    role_prefix                = optional(string, "CodeArtifactProxyRole")
+    secret_prefix              = optional(string, "codeartifact-proxy-auth-secret")
+    task_definition            = optional(string, "codeartifact-proxy-task-definition")
+    log_group                  = optional(string, "/ecs/codeartifact-proxy")
+    load_balancer_target_group = optional(string, "codeartifact-proxy-lb-tg")
+    load_balancer_listener     = optional(string, "codeartifact-proxy-lb-listener")
+    load_balancer              = optional(string, "codeartifact-proxy-load-balancer")
   })
   default = {}
 }
@@ -31,11 +42,16 @@ variable "authentication" {
 
 variable "tags" {
   type = object({
-    service         = optional(map(string))
-    cluster         = optional(map(string))
-    role            = optional(map(string))
-    task_definition = optional(map(string))
-    security_group  = optional(map(string))
+    service                    = optional(map(string))
+    cluster                    = optional(map(string))
+    role                       = optional(map(string))
+    secret                     = optional(map(string))
+    task_definition            = optional(map(string))
+    security_group             = optional(map(string))
+    log_group                  = optional(map(string))
+    load_balancer_target_group = optional(map(string))
+    load_balancer_listener     = optional(map(string))
+    load_balancer              = optional(map(string))
   })
   default = {}
 }
@@ -80,3 +96,4 @@ variable "image_tag" {
   default     = null
   description = "Defaults to the same tag version as the Terraform module."
 }
+

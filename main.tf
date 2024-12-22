@@ -41,6 +41,20 @@ resource "aws_cloudwatch_log_group" "lg" {
   name = var.names.log_group
 }
 
+resource "aws_secretsmanager_secret" "auth" {
+  count       = var.authentication.allow_anonymous ? 0 : 1
+  name_prefix = var.names.secret_prefix
+}
+
+resource "aws_secretsmanager_secret_version" "auth" {
+  count     = var.authentication.allow_anonymous ? 0 : 1
+  secret_id = aws_secretsmanager_secret.auth[0].id
+  secret_string = jsonencode({
+    username = var.authentication.username
+    password = var.authentication.password
+  })
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = var.names.task_definition
   network_mode             = "awsvpc"
@@ -60,8 +74,8 @@ resource "aws_ecs_task_definition" "this" {
       portMappings = [
         {
           containerPort = var.networking.container_port
-          hostPort      = var.networking.host_port
-          protocol      = "TCP"
+          hostPort      = var.networking.container_port
+          protocol      = "HTTP"
         },
       ],
       logConfiguration = {
@@ -72,7 +86,7 @@ resource "aws_ecs_task_definition" "this" {
           "awslogs-stream-prefix" = "ecs"
         }
       },
-      environment = [
+      environment = concat([
         {
           name  = "PROXY_REGION"
           value = local.codeartifact_region
@@ -97,20 +111,15 @@ resource "aws_ecs_task_definition" "this" {
           name  = "PROXY_SERVER_PORT"
           value = tostring(var.networking.container_port)
         }
-      ]
-      secret = concat(var.authentication.username != null ? [
+        ], var.authentication.allow_anonymous ? [] : [
         {
-          name  = "PROXY_USERNAME"
-          value = var.authentication.username
+          name  = "PROXY_SECRET_ID"
+          value = try(aws_secretsmanager_secret.auth[0].id)
         }
-        ] : [], var.authentication.password != null ? [
-        {
-          name  = "PROXY_PASSWORD"
-          value = var.authentication.password
-        }
-      ] : [])
+      ])
     }
   ])
+  depends_on = [aws_cloudwatch_log_group.lg]
 }
 
 resource "aws_ecs_service" "this" {
@@ -136,6 +145,46 @@ resource "aws_ecs_service" "this" {
     subnets          = var.networking.subnets
   }
 
+  load_balancer {
+    container_name   = local.image_name
+    container_port   = var.networking.container_port
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+
   tags       = var.tags.service
   depends_on = [aws_ecs_cluster.cluster]
+}
+
+resource "aws_lb" "this" {
+  name               = var.names.load_balancer
+  internal           = true
+  load_balancer_type = "application"
+  security_groups    = local.security_groups
+  subnets            = var.networking.subnets
+}
+
+resource "aws_lb_target_group" "this" {
+  name        = var.names.load_balancer_target_group
+  port        = var.networking.host_port
+  protocol    = "HTTP"
+  vpc_id      = var.networking.vpc_id
+  target_type = "ip"
+  health_check {
+    path                = "/"
+    interval            = var.networking.health_check.interval
+    timeout             = var.networking.health_check.timeout
+    healthy_threshold   = var.networking.health_check.healthy_threshold
+    unhealthy_threshold = var.networking.health_check.unhealthy_threshold
+  }
+}
+
+resource "aws_lb_listener" "this" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = var.networking.host_port
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this.arn
+  }
 }

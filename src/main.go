@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"io"
 	"log"
 	"net/http"
@@ -21,8 +23,7 @@ type Config struct {
 	AccountId      string `env:"PROXY_ACCOUNT_ID,required=true"`
 	Domain         string `env:"PROXY_DOMAIN,required=true"`
 	Repository     string `env:"PROXY_REPOSITORY,required=true"`
-	Username       string `env:"PROXY_USERNAME"`
-	Password       string `env:"PROXY_PASSWORD"`
+	SecretId       string `env:"PROXY_SECRET_ID"`
 	AllowAnonymous bool   `env:"PROXY_ALLOW_ANONYMOUS"`
 	ServerPort     string `env:"PROXY_SERVER_PORT,default=5000"`
 }
@@ -32,6 +33,8 @@ var (
 	tokenMutex sync.RWMutex
 	config     Config
 	client     *codeartifact.CodeArtifact
+	username   string
+	password   string
 )
 
 func updateAuthToken() {
@@ -68,6 +71,40 @@ func generateURL(path string) string {
 		config.Repository,
 		path,
 	)
+}
+
+func fetchSecret(sess *session.Session) (string, string) {
+	if config.SecretId == "" {
+		log.Println("No SecretId provided. Skipping secret fetch.")
+		return "", ""
+	}
+
+	secretsClient := secretsmanager.New(sess)
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(config.SecretId),
+	}
+
+	result, err := secretsClient.GetSecretValue(input)
+	if err != nil {
+		log.Fatalf("Failed to retrieve secret: %v", err)
+	}
+
+	log.Println("Fetched secret from Secrets Manager")
+
+	secretString := aws.StringValue(result.SecretString)
+	keyValue := make(map[string]string)
+	err = json.Unmarshal([]byte(secretString), &keyValue)
+	if err != nil {
+		log.Fatalf("Failed to parse secret: %v", err)
+	}
+
+	username, usernameExists := keyValue["username"]
+	password, passwordExists := keyValue["password"]
+	if !usernameExists || !passwordExists || username == "" || password == "" {
+		log.Fatalf("Username or password not found or empty in secret")
+	}
+
+	return username, password
 }
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,13 +165,13 @@ func basicAuthMiddleware(next http.Handler) http.Handler {
 		return next
 	}
 
-	if config.Username == "" || config.Password == "" {
+	if username == "" || password == "" {
 		log.Fatal("Username and password must be set if anonymous access is not allowed")
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, ok := r.BasicAuth()
-		if !ok || u != config.Username || p != config.Password {
+		if !ok || u != username || p != password {
 			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -158,6 +195,10 @@ func main() {
 		log.Fatalf("Failed to create AWS session: %v", err)
 	}
 	client = codeartifact.New(sess)
+
+	if config.SecretId != "" {
+		username, password = fetchSecret(sess)
+	}
 
 	// Initialize token
 	updateAuthToken()
