@@ -1,11 +1,10 @@
 
 variable "networking" {
   type = object({
-    vpc_id                 = string
-    subnets                = list(string)
-    security_groups        = optional(list(string), [])
-    container_port         = optional(number, 5000)
-    external_load_balancer = optional(bool, true)
+    vpc_id          = string
+    subnets         = list(string)
+    security_groups = optional(list(string), [])
+    container_port  = optional(number, 5000)
 
     health_check = optional(object({
       path                = optional(string, "/health")
@@ -14,21 +13,22 @@ variable "networking" {
       healthy_threshold   = optional(number, 5)
       unhealthy_threshold = optional(number, 2)
     }), {})
+
+    external_target_group_arn = optional(string)
   })
 }
 
 variable "names" {
   type = object({
-    service                    = optional(string, "codeartifact-proxy-service")
-    security_group_prefix      = optional(string, "codeartifact-proxy-security-group")
-    cluster                    = optional(string, "codeartifact-proxy-cluster")
+    service                    = optional(string, "cap-service")
+    security_group_prefix      = optional(string, "cap-sg")
+    cluster                    = optional(string, "cap-cluster")
     role_prefix                = optional(string, "CodeArtifactProxyRole")
-    secret_prefix              = optional(string, "codeartifact-proxy-auth-secret")
-    task_definition            = optional(string, "codeartifact-proxy-task-definition")
+    secret_prefix              = optional(string, "cap-auth-secret")
+    task_definition            = optional(string, "cap-td")
     log_group                  = optional(string, "/ecs/codeartifact-proxy")
-    load_balancer_target_group = optional(string, "codeartifact-proxy-lb-tg")
-    load_balancer_listener     = optional(string, "codeartifact-proxy-lb-listener")
-    load_balancer              = optional(string, "codeartifact-proxy-load-balancer")
+    load_balancer_target_group = optional(string, "cap-tg")
+    load_balancer              = optional(string, "cap-lb")
   })
   default = {}
 }
@@ -108,3 +108,4 @@ variable "hosting" {
   })
   default = null
 }
+
