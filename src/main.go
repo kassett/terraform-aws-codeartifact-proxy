@@ -110,6 +110,10 @@ func fetchSecret(sess *session.Session) (string, string) {
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
+
+	// Log the origin host
+	log.Printf("Origin Host: %s", r.Host)
+
 	log.Printf("%s %s\n", r.Method, r.URL.Path)
 
 	switch r.Method {
