@@ -10,12 +10,52 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
   }
 }
 
-data "aws_iam_policy_document" "ecs_task_allow" {
+data "aws_iam_policy_document" "ecs_task_access" {
+  statement {
+    effect = "Allow"
+    resources = ["*"]
+    actions = ["sts:GetServiceBearerToken"]
+    sid    = "AccessToCreateBearerToken"
+    condition {
+      test     = "StringEquals"
+      values = ["codeartifact.amazonaws.com"]
+      variable = "sts:AWSServiceName"
+    }
+  }
+
+# TODO: Determine if these are necessary permissions
+#   # Access to the domain
+#   dynamic "statement" {
+#     for_each = toset(local.unique_domains)
+#     content {
+#       effect = "Allow"
+#       resources = [
+#         "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:domain/${statement.value}"
+#       ]
+#       actions = ["codeartifact:*"]
+#     }
+#   }
+
+  # Access to the repositories
+  dynamic "statement" {
+    for_each = toset(range(length(var.repositories)))
+    content {
+      effect = "Allow"
+      resources = [
+        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].domain}",
+        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].domain}/*"
+      ]
+      actions = ["codeartifact:*"]
+    }
+  }
+
+  # Access to cloudwatch logs
   statement {
     effect    = "Allow"
     actions   = ["logs:DescribeLogGroups"]
     resources = ["*"]
   }
+
   statement {
     effect = "Allow"
     actions = [
@@ -29,27 +69,7 @@ data "aws_iam_policy_document" "ecs_task_allow" {
     ]
   }
 
-  statement {
-    effect = "Allow"
-    sid    = "AccessToCodeArtifactRepository"
-    actions = [
-      "codeartifact:*",
-    ]
-    resources = [
-      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}",
-      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:repository/${var.repository_settings.domain}/${var.repository_settings.repository}/*"
-    ]
-  }
-
-  statement {
-    effect  = "Allow"
-    sid     = "AccessToCreateAuthToken"
-    actions = ["codeartifact:GetAuthorizationToken"]
-    resources = [
-      "arn:aws:codeartifact:${local.codeartifact_region}:${local.codeartifact_account_id}:domain/${var.repository_settings.domain}",
-    ]
-  }
-
+  # Only created if anonymous access is not allowed
   dynamic "statement" {
     for_each = var.authentication.allow_anonymous ? [] : toset([0])
     content {
@@ -59,18 +79,6 @@ data "aws_iam_policy_document" "ecs_task_allow" {
       resources = [
         aws_secretsmanager_secret.auth[0].arn
       ]
-    }
-  }
-
-  statement {
-    effect    = "Allow"
-    resources = ["*"]
-    actions   = ["sts:GetServiceBearerToken"]
-    sid       = "AccessToCreateBearerToken"
-    condition {
-      test     = "StringEquals"
-      values   = ["codeartifact.amazonaws.com"]
-      variable = "sts:AWSServiceName"
     }
   }
 }
@@ -84,13 +92,6 @@ resource "aws_iam_role" "ecs_task_execution" {
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_internal_policy" {
-  count  = var.codeartifact_policy == null ? 1 : 0
   role   = aws_iam_role.ecs_task_execution.id
-  policy = data.aws_iam_policy_document.ecs_task_allow.json
-}
-
-resource "aws_iam_role_policy" "ecs_task_allow_external_policy" {
-  count  = var.codeartifact_policy != null ? 1 : 0
-  role   = aws_iam_role.ecs_task_execution.id
-  policy = var.codeartifact_policy
+  policy = data.aws_iam_policy_document.ecs_task_access.json
 }
