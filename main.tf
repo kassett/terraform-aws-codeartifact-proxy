@@ -29,6 +29,13 @@ check "unique_domains" {
   }
 }
 
+check "supported_package_managers" {
+  assert {
+    condition = alltrue([ for hos in var.repositories : contains(["npm", "pypi", "maven"], hos.package_manager)])
+    error_message = "The package manager must be one of 'npm', 'pypi', or 'maven'."
+  }
+}
+
 # Validation that all domains and repositories exist
 # Also validates that the format -- i.e. the package manager -- provided is valid
 data "aws_codeartifact_repository_endpoint" "repository" {

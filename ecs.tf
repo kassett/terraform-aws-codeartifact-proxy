@@ -2,9 +2,10 @@
 locals {
   config_file_location = "/app/config.json"
   repository_config_file = jsonencode([ for hos in var.repositories : {
-    Hosts = concat(hos.hostname, hos.additional_hosts)
-    CodeArtifactDomain = hos.domain
-    CodeArtifactRepository = hos.repository
+    hosts = concat(hos.hostname, hos.additional_hosts)
+    code_artifact_domain = hos.domain
+    code_artifact_repository = hos.repository
+    package_manager_format = hos.package_manager
   }])
 }
 
