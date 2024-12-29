@@ -41,12 +41,47 @@ resource "aws_lb_target_group" "this" {
   depends_on = [aws_lb.this]
 }
 
+data "aws_route53_zone" "this" {
+  count = length(var.repositories)
+  id  = var.repositories[count.index].zone_id
+}
+
+resource "aws_route53_record" "alias_record" {
+  count = length(var.repositories)
+
+  zone_id = data.aws_route53_zone.this[count.index].zone_id
+  name    = var.repositories[count.index].hostname
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.this[0].dns_name
+    zone_id                = aws_lb.this[0].zone_id
+    evaluate_target_health = true
+  }
+}
+
+module "certificate" {
+  count = length(var.repositories)
+
+  source              = "terraform-aws-modules/acm/aws"
+
+  domain_name         = var.repositories[count.index].hostname
+  validation_method   = "DNS"
+  validate_certificate = true
+
+  create_route53_records = true
+  validation_record_fqdns = [aws_route53_record.alias_record[count.index].fqdn]
+
+  depends_on = [aws_route53_record.alias_record]
+}
+
 resource "aws_lb_listener" "this" {
+  count = length(var.repositories)
   load_balancer_arn = aws_lb.this[0].arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = var.ssl_policy
-  certificate_arn   = aws_acm_certificate_validation.this[0].certificate_arn
+  certificate_arn   = module.certificate[count.index].acm_certificate_arn
 
   default_action {
     type             = "forward"

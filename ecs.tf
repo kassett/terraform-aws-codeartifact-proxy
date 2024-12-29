@@ -9,6 +9,12 @@ locals {
   }])
 }
 
+resource "aws_ecs_cluster" "cluster" {
+  count = var.create_cluster ? 1 : 0
+  name  = var.names.cluster
+  tags  = var.tags.cluster
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = var.names.task_definition
   network_mode             = "awsvpc"
@@ -85,4 +91,31 @@ resource "aws_ecs_task_definition" "this" {
     }
   ])
   depends_on = [aws_cloudwatch_log_group.lg]
+}
+
+resource "aws_ecs_service" "this" {
+  name                  = var.names.service
+  cluster               = var.names.cluster
+  task_definition       = aws_ecs_task_definition.this.arn
+  desired_count         = var.replicas
+  wait_for_steady_state = false
+  launch_type           = "FARGATE"
+
+  deployment_circuit_breaker {
+    enable   = false
+    rollback = false
+  }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
+  network_configuration {
+    assign_public_ip = false
+    security_groups  = local.security_groups
+    subnets          = var.networking.subnets
+  }
+
+  tags       = var.tags.service
+  depends_on = [aws_lb_listener.this, aws_ecs_cluster.cluster]
 }

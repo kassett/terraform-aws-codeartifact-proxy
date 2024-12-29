@@ -86,7 +86,6 @@ variable "repositories" {
 
     hostname = optional(string)
     zone_id = optional(string)
-    managed_externally = optional(bool, false)
 
     # Additional hosts that might be used, perhaps from CloudFlare
     additional_hosts = optional(list(string), [])
@@ -108,9 +107,12 @@ variable "networking" {
       healthy_threshold   = optional(number, 5)
       unhealthy_threshold = optional(number, 2)
     }), {})
-
-    external_target_group_arn = optional(string)
   })
+}
+
+variable "create_cluster" {
+  type = bool
+  default = true
 }
 
 variable "ssl_policy" {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/codeartifact"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strings"
@@ -22,6 +21,7 @@ var (
 	anonymousAccess       bool
 	username              string
 	password              string
+	refreshCadence        int
 
 	domainTokens       map[string]string
 	codeArtifactClient *codeartifact.CodeArtifact
@@ -47,7 +47,7 @@ func refreshAuthTokens() {
 
 		domainTokens[domain] = aws.StringValue(result.AuthorizationToken)
 
-		log.Println("Got new token")
+		log.Println("Got new token for domain:", domain)
 	}
 
 	// Now let's get the AWS generated repository URLs
@@ -70,15 +70,8 @@ func refreshAuthTokens() {
 				"Handling such a repository is not currently supported.", *endpoint)
 		}
 
-		if strings.HasSuffix(*endpoint, "/") {
-			*endpoint = (*endpoint)[:len(*endpoint)-1]
-		}
-
-		authenticatedEndpoint := strings.Replace(*endpoint,
-			"https://", fmt.Sprintf("https://aws:%s@", domainTokens[rep.CodeArtifactDomain]), 1)
-
 		for _, host := range rep.Hosts {
-			hostQuickLookup[host] = authenticatedEndpoint
+			hostQuickLookup[host] = *endpoint
 		}
 	}
 }
@@ -103,16 +96,15 @@ func main() {
 	refreshAuthTokens()
 	// Set up a goroutine to refresh the auth tokens every 6 hours
 	go func() {
-		for range time.Tick(6 * time.Hour) {
+		for range time.Tick(time.Duration(refreshCadence) * time.Second) {
 			refreshAuthTokens()
 		}
 	}()
 
-	// Set up routes
-	r := mux.NewRouter()
-	r.HandleFunc(healthCheckPath, healthCheckHandler).Methods(http.MethodGet) // Unauthenticated route
-
-	// Start server
-	log.Printf("Server starting on port %d\n", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), r))
+	fmt.Println("Starting server on port:", port)
+	http.HandleFunc("/", ProxyRequestHandler)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

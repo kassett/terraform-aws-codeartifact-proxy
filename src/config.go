@@ -18,6 +18,7 @@ type EnvVars struct {
 	CapConfigPath      string `env:"CAP_CONFIG_PATH,default=/app/config.json"`
 	CapHealthCheckPath string `env:"CAP_HEALTH_CHECK_PATH,default=/health"`
 	CapAuthSecret      string `env:"CAP_AUTH_SECRET"`
+	CapRefreshCadence  int    `env:"CAP_REFRESH_CADENCE,default=10800"`
 }
 
 // RepositoryConfig This proxy can support multiple packages managers, but each must have a different host
@@ -45,6 +46,7 @@ func unmarshallConfig() *session.Session {
 	port = config.CapPort
 	region = config.CapRegion
 	accountId = config.CapAccountId
+	refreshCadence = config.CapRefreshCadence
 
 	// Read the JSON configuration file
 	bytes, err := os.ReadFile(configPath)
