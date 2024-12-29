@@ -1,12 +1,11 @@
 
 locals {
-  config_file_location = "/app/config.json"
-  repository_config_file = jsonencode([ for hos in var.repositories : {
-    hosts = concat(hos.hostname, hos.additional_hosts)
-    code_artifact_domain = hos.domain
+  repository_config_file = base64encode(jsonencode([for hos in var.repositories : {
+    hosts                    = concat([hos.hostname], hos.additional_hosts)
+    code_artifact_domain     = hos.domain
     code_artifact_repository = hos.repository
-    package_manager_format = hos.package_manager
-  }])
+    package_manager_format   = hos.package_manager
+  }]))
 }
 
 resource "aws_ecs_cluster" "cluster" {
@@ -23,12 +22,43 @@ resource "aws_ecs_task_definition" "this" {
   memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task_execution.arn
+  volume {
+    name = "config"
+  }
 
   container_definitions = jsonencode([
     {
+      name      = "config-writer"
+      image     = "alpine:latest"
+      essential = false
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/etc/cap"
+        }
+      ],
+      command = [
+        "sh",
+        "-c",
+        "echo '${local.repository_config_file}' | base64 -d - | tee /etc/cap/config.json"
+      ]
+    },
+    {
       name      = local.image_name,
       image     = "${local.image_repository}/${local.image_name}:${local.image_tag}",
-      essential = true,
+      essential = true
+      dependsOn = [
+        {
+          containerName = "config-writer"
+          condition     = "COMPLETE"
+        }
+      ]
+      mountPoints = [
+        {
+          sourceVolume  = "config"
+          containerPath = "/etc/cap"
+        }
+      ]
 
       # Unfortunately, AWS provides no way to mount a single file
       # It is an open issue but there seems to be no progress on it
@@ -36,13 +66,8 @@ resource "aws_ecs_task_definition" "this" {
 
       # Using an entrypoint ensures no race condition,
       # as opposed to potentially using a different container
-      entryPoint = [
-        "/bin/bash",
-        "-c",
-        "echo '${local.repository_config_file}' > /app/config.json"
-      ]
-      cpu       = var.task_cpu
-      memory    = var.task_memory
+      cpu    = var.task_cpu
+      memory = var.task_memory
       portMappings = [
         {
           containerPort = var.networking.container_port
@@ -76,8 +101,8 @@ resource "aws_ecs_task_definition" "this" {
           value = tostring(var.networking.container_port)
         },
         {
-          name = "CAP_CONFIG_PATH"
-          value = local.config_file_location
+          name  = "CAP_CONFIG_PATH"
+          value = "/etc/cap/config.json"
         },
         {
           name  = "CAP_HEALTH_CHECK_PATH"

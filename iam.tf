@@ -12,29 +12,29 @@ data "aws_iam_policy_document" "ecs_tasks_assume" {
 
 data "aws_iam_policy_document" "ecs_task_access" {
   statement {
-    effect = "Allow"
+    effect    = "Allow"
     resources = ["*"]
-    actions = ["sts:GetServiceBearerToken"]
-    sid    = "AccessToCreateBearerToken"
+    actions   = ["sts:GetServiceBearerToken"]
+    sid       = "AccessToCreateBearerToken"
     condition {
       test     = "StringEquals"
-      values = ["codeartifact.amazonaws.com"]
+      values   = ["codeartifact.amazonaws.com"]
       variable = "sts:AWSServiceName"
     }
   }
 
-# TODO: Determine if these are necessary permissions
-#   # Access to the domain
-#   dynamic "statement" {
-#     for_each = toset(local.unique_domains)
-#     content {
-#       effect = "Allow"
-#       resources = [
-#         "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:domain/${statement.value}"
-#       ]
-#       actions = ["codeartifact:*"]
-#     }
-#   }
+  # TODO: Determine if these are necessary permissions
+  # Access to the domain
+  dynamic "statement" {
+    for_each = toset(local.unique_domains)
+    content {
+      effect = "Allow"
+      resources = [
+        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:domain/${statement.value}"
+      ]
+      actions = ["codeartifact:*"]
+    }
+  }
 
   # Access to the repositories
   dynamic "statement" {
@@ -42,8 +42,8 @@ data "aws_iam_policy_document" "ecs_task_access" {
     content {
       effect = "Allow"
       resources = [
-        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].domain}",
-        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].domain}/*"
+        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].repository}",
+        "arn:aws:codeartifact:${data.aws_region.this.name}:${data.aws_caller_identity.this.account_id}:repository/${var.repositories[statement.value].domain}/${var.repositories[statement.value].repository}/*"
       ]
       actions = ["codeartifact:*"]
     }
