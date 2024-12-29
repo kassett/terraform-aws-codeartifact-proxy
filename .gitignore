@@ -48,3 +48,7 @@ secrets.auto.tfvars
 # Test and coverage data
 *.coverprofile
 *.cov
+
+# Application specific
+testing.json
+*.py

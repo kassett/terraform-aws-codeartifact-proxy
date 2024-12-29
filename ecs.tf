@@ -11,7 +11,7 @@ locals {
 resource "aws_ecs_cluster" "cluster" {
   count = var.create_cluster ? 1 : 0
   name  = var.names.cluster
-  tags  = var.tags.cluster
+  tags  = merge(var.default_tags, var.tags.cluster)
 }
 
 resource "aws_ecs_task_definition" "this" {
@@ -22,6 +22,9 @@ resource "aws_ecs_task_definition" "this" {
   memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task_execution.arn
+
+  tags  = merge(var.default_tags, var.tags.task_definition)
+
   volume {
     name = "config"
   }
@@ -141,6 +144,12 @@ resource "aws_ecs_service" "this" {
     subnets          = var.networking.subnets
   }
 
-  tags       = var.tags.service
+  load_balancer {
+    container_name = local.image_name
+    container_port = var.networking.container_port
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+
+  tags  = merge(var.default_tags, var.tags.service)
   depends_on = [aws_lb_listener.this, aws_ecs_cluster.cluster]
 }

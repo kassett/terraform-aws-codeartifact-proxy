@@ -8,13 +8,14 @@ files to containers can be tedious, etc. In many cases, it may be easier
 to just use a VPN or security group rules for everyday use. This tool allows you to do that.
 
 ### Current support
-Currently, there is only support for acting as a PyPI server, but NPM, Yarn, and Maven
-will be pushed soon.
+Current support is for PYPI, NPM, and Maven. Yarn likely is also supported but hasn't been tested
+thoroughly. NuGet, Cargo, and Ruby are on the roadmap.
+
+### Current limitations
+Scoped packages for NPM are currently not supported. This is next on the list.
 
 ### Required permissions
-If you wish to attach custom permissions to the ECS task, you can use the `codeartifact_policy` argument.
-By default, the CodeArtifact Proxy container is given 3 permissions:
-* Full access to specified CodeArtifact repository
+* Full access to specified CodeArtifact repositories and domains
 * Access to create a bearer token to specified domain
 * Access to create log streams and put logs to the specified log group
 
@@ -26,85 +27,44 @@ the container on startup. This means that changing the username/password will
 require the tasks to be restarted.
 
 ### Hosting
-Specifying the hosting variable object will trigger the creation of a load balancer, 
-load balancer listener, target group, route, and certificate. The certificate
-will be validated automatically and the record is a CNAME record.
+The domain / repository / format are identified by the hostname. Therefore, 
+each host must be unique per `repository` object. These routes are secured with ACM,
+but if you are using external certificates, there is an `additional_hosts` variable that can be added.
 
 ### Environment variables
 The following environment variables are exposed in the Docker container
 
-| Environment Variable         | Default Value           | Terraform Variable                                    |
-|------------------------------|-------------------------|-------------------------------------------------------|
-| `PROXY_REGION`               | `null`                  | `repository_settings.region`                          |
-| `PROXY_ACCOUNT_ID`           | `null`                  | `repository_settings.account_id`                      |
-| `PROXY_DOMAIN`               | `null`                  | `repository_settings.domain`                          |
-| `PROXY_REPOSITORY`           | `null`                  | `repository_settings.repository`                      |
-| `PROXY_SECRET_ID`            | `null`                  | `authentication.username && authentication.password`  |
-| `PROXY_ALLOW_ANONYMOUS`      | `null`                  | `authentication.allow_anonymous`                      |
-| `PROXY_SERVER_PORT`          | `5000`                  | `networking.container_port`                           |
-| `PROXY_HEALTH_CHECK_PATH`    | `/health`               | `var.networking.health_check.path`                    |
+| Environment Variable    | Default Value      | Terraform Variable                                   |
+|-------------------------|--------------------|------------------------------------------------------|
+| `CAP_REGION`            | `null`             | `repository_settings.region`                         |
+| `CAP_ACCOUNT_ID`        | `null`             | `repository_settings.account_id`                     |
+| `CAP_AUTH_SECRET`       | `""`               | `authentication.username && authentication.password` |
+| `CAP_ALLOW_ANONYMOUS`   | `null`             | `authentication.allow_anonymous`                     |
+| `CAP_PORT`              | `5000`             | `networking.container_port`                          |
+| `CAP_HEALTH_CHECK_PATH` | `/health`          | `var.networking.health_check.path`                   |
+| `CAP_CONFIG_PATH`       | `/app/config.json` | `null`                                               |
+| `CAP_REFRESH_CADENCE`   | `10800`            | `null`                                               |
 
 ### Examples
 
 ```terraform
 # Example minimal usage
 module "codeartifact-proxy" {
-  repository_settings = {
+  repositories = [{
     domain = aws_codeartifact_domain.pypi.domain
     repository = aws_codeartifact_repository.pypi.repository
-  }
+    hostname = "pypi.company.io"
+    zone_name = "company.io"
+    package_manager = "pypi"
+  }]
   
   networking = {
     vpc_id = "VPC_ID"
     subnets = ["PRIVATE_SUBNET", "PRIVATE_SUBNET"]
-  }
-
-  hosting = {
-    zone_name = "example.com"
-    record_name = "pypi"
   }
 
   authentication = {
     allow_anonymous = true
-  }
-}
-```
-
-```terraform
-# Example extended configuration
-module "codeartifact-proxy" {
-  repository_settings = {
-    domain = aws_codeartifact_domain.pypi.domain
-    repository = aws_codeartifact_repository.pypi.repository
-  }
-  
-  names = {
-    service = "cd-proxy"
-  }
-
-  networking = {
-    vpc_id = "VPC_ID"
-    subnets = ["PRIVATE_SUBNET", "PRIVATE_SUBNET"]
-    health_check = {
-      timeout = 1
-      interval = 30
-    }
-  }
-
-  tags = {
-    service = {
-      SERVICE_TAG = "SERVICE_TAG_VALUE"
-    }
-  }
-
-  hosting = {
-    zone_name = "example.com"
-    record_name = "pypi"
-  }
-
-  authentication = {
-    username = "USERNAME"
-    password = "PASSWORD"
   }
 }
 ```

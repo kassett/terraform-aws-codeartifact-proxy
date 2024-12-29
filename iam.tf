@@ -89,6 +89,8 @@ resource "aws_iam_role" "ecs_task_execution" {
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
   ]
+
+  tags  = merge(var.default_tags, var.tags.role)
 }
 
 resource "aws_iam_role_policy" "ecs_task_allow_internal_policy" {
