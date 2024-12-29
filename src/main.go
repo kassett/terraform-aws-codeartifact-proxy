@@ -101,6 +101,11 @@ func main() {
 		}
 	}()
 
+	http.HandleFunc(healthCheckPath, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status": "ok", "message": "Service is running"}`))
+	})
+
 	fmt.Println("Starting server on port:", port)
 	http.HandleFunc("/", ProxyRequestHandler)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)

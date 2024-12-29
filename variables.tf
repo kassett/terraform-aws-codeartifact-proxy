@@ -62,30 +62,31 @@ variable "authentication" {
       var.authentication.password == null &&
       var.authentication.allow_anonymous
     )
+    error_message = "`username` and `password` must be defined together, or `allow_anonymous` must be true."
   }
   sensitive = true
 }
 
 variable "default_tags" {
-  type = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
   description = "Tags to be applied to every applicable resource."
 }
 
 variable "image_tag" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "If null, defaults to the current version of the Terraform module."
 }
 
 variable "repositories" {
   type = list(object({
     package_manager = string
-    domain = string
-    repository = string
+    domain          = string
+    repository      = string
 
-    hostname = optional(string)
-    zone_id = optional(string)
+    hostname  = string
+    zone_name = string
 
     # Additional hosts that might be used, perhaps from CloudFlare
     additional_hosts = optional(list(string), [])
@@ -94,10 +95,10 @@ variable "repositories" {
 
 variable "networking" {
   type = object({
-    vpc_id          = string
-    subnets         = list(string)
-    security_groups = optional(list(string), [])
-    container_port  = optional(number, 5000)
+    vpc_id            = string
+    subnets           = list(string)
+    security_groups   = optional(list(string), [])
+    container_port    = optional(number, 5000)
     load_balancer_arn = optional(string)
 
     health_check = optional(object({
@@ -111,11 +112,11 @@ variable "networking" {
 }
 
 variable "create_cluster" {
-  type = bool
+  type    = bool
   default = true
 }
 
 variable "ssl_policy" {
-  type = string
+  type    = string
   default = "ELBSecurityPolicy-TLS13-1-2-2021-06"
 }
