@@ -32,11 +32,11 @@ output "task_definition_id" {
 }
 
 output "security_group_ids" {
-  value = aws_ecs_service.this.network_configuration.security_groups
+  value = aws_ecs_service.this.network_configuration[*].security_groups
 }
 
 output "subnets" {
-  value = aws_ecs_service.this.network_configuration.subnets
+  value = aws_ecs_service.this.network_configuration[*].subnets
 }
 
 output "load_balancer_arn" {
@@ -48,9 +48,9 @@ output "load_balancer_name" {
 }
 
 output "lb_listener_arn_map" {
-  value = { for i in range(var.repositories) : var.repositories[i].hostname => aws_lb_listener.this[i].arn }
+  value = { for i in range(length(var.repositories)) : var.repositories[i].hostname => aws_lb_listener.this[i].arn }
 }
 
 output "certificate_arn_map" {
-  value = { for i in range(var.repositories) : var.repositories[i].hostname => aws_acm_certificate_validation.this[i].certificate_arn }
+  value = { for i in range(length(var.repositories)) : var.repositories[i].hostname => aws_acm_certificate_validation.this[i].certificate_arn }
 }
