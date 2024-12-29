@@ -1,44 +1,32 @@
 
-variable "networking" {
-  type = object({
-    vpc_id          = string
-    subnets         = list(string)
-    security_groups = optional(list(string), [])
-    container_port  = optional(number, 5000)
+variable "replicas" {
+  type    = number
+  default = 1
+}
 
-    health_check = optional(object({
-      path                = optional(string, "/health")
-      interval            = optional(number, 30)
-      timeout             = optional(number, 5)
-      healthy_threshold   = optional(number, 5)
-      unhealthy_threshold = optional(number, 2)
-    }), {})
+variable "task_cpu" {
+  type    = number
+  default = 256
+}
 
-    external_target_group_arn = optional(string)
-  })
+variable "task_memory" {
+  type    = number
+  default = 512
 }
 
 variable "names" {
   type = object({
-    service                    = optional(string, "cap-service")
-    security_group_prefix      = optional(string, "cap-sg")
-    cluster                    = optional(string, "cap-cluster")
-    role_prefix                = optional(string, "CodeArtifactProxyRole")
-    secret_prefix              = optional(string, "cap-auth-secret")
-    task_definition            = optional(string, "cap-td")
-    log_group                  = optional(string, "/ecs/codeartifact-proxy")
-    load_balancer_target_group = optional(string, "cap-tg")
-    load_balancer              = optional(string, "cap-lb")
+    service                           = optional(string, "cap-service")
+    security_group_prefix             = optional(string, "cap-sg")
+    cluster                           = optional(string, "cap-cluster")
+    role_prefix                       = optional(string, "CodeArtifactProxyRole")
+    secret_prefix                     = optional(string, "cap-auth-secret")
+    task_definition                   = optional(string, "cap-td")
+    log_group                         = optional(string, "/ecs/codeartifact-proxy")
+    load_balancer_target_group_prefix = optional(string, "cap-tg")
+    load_balancer_prefix              = optional(string, "cap-lb")
   })
   default = {}
-}
-
-variable "authentication" {
-  type = object({
-    username        = optional(string)
-    password        = optional(string)
-    allow_anonymous = optional(bool)
-  })
 }
 
 variable "tags" {
@@ -58,54 +46,76 @@ variable "tags" {
   default = {}
 }
 
-variable "create_cluster" {
-  type    = bool
-  default = true
-}
-
-variable "repository_settings" {
+variable "authentication" {
   type = object({
-    region     = optional(string)
-    domain     = string
-    repository = string
-    account_id = optional(string)
+    username        = optional(string)
+    password        = optional(string)
+    allow_anonymous = optional(bool)
   })
+
+  validation {
+    condition = (
+      var.authentication.username != null &&
+      var.authentication.password != null &&
+      !var.authentication.allow_anonymous) || (
+      var.authentication.username == null &&
+      var.authentication.password == null &&
+      var.authentication.allow_anonymous
+    )
+  }
+  sensitive = true
 }
 
-variable "task_cpu" {
-  type    = number
-  default = 256
-}
-
-variable "task_memory" {
-  type    = number
-  default = 512
-}
-
-variable "replicas" {
-  type    = number
-  default = 1
-}
-
-variable "codeartifact_policy" {
-  type        = string
-  default     = null
-  description = "Defaults to full access for the designated domain and repository."
+variable "default_tags" {
+  type = map(string)
+  default = {}
+  description = "Tags to be applied to every applicable resource."
 }
 
 variable "image_tag" {
-  type        = string
-  default     = null
-  description = "Defaults to the same tag version as the Terraform module."
-}
-
-variable "hosting" {
-  type = object({
-    zone_name   = string
-    record_name = string
-    dns_ttl     = optional(number, 60)
-    ssl_policy  = optional(string, "ELBSecurityPolicy-TLS13-1-2-2021-06")
-  })
+  type = string
   default = null
+  description = "If null, defaults to the current version of the Terraform module."
 }
 
+variable "repositories" {
+  type = list(object({
+    package_manager = string
+    domain = string
+    repository = string
+
+    hostname = optional(string)
+    zone_id = optional(string)
+
+    # Additional hosts that might be used, perhaps from CloudFlare
+    additional_hosts = optional(list(string), [])
+  }))
+}
+
+variable "networking" {
+  type = object({
+    vpc_id          = string
+    subnets         = list(string)
+    security_groups = optional(list(string), [])
+    container_port  = optional(number, 5000)
+    load_balancer_arn = optional(string)
+
+    health_check = optional(object({
+      path                = optional(string, "/health")
+      interval            = optional(number, 30)
+      timeout             = optional(number, 5)
+      healthy_threshold   = optional(number, 5)
+      unhealthy_threshold = optional(number, 2)
+    }), {})
+  })
+}
+
+variable "create_cluster" {
+  type = bool
+  default = true
+}
+
+variable "ssl_policy" {
+  type = string
+  default = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+}
