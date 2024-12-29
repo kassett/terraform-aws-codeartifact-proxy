@@ -71,7 +71,7 @@ func unmarshallConfig() *session.Session {
 	}
 
 	// Fetch secret from AWS Secrets Manager if CAP_AUTH_SECRET is set
-	if anonymousAccess && config.CapAuthSecret != "" {
+	if !anonymousAccess && config.CapAuthSecret != "" {
 		secretsClient := secretsmanager.New(sess)
 		input := &secretsmanager.GetSecretValueInput{
 			SecretId: aws.String(config.CapAuthSecret),
@@ -91,11 +91,19 @@ func unmarshallConfig() *session.Session {
 			log.Fatalf("Failed to parse secret: %v", err)
 		}
 
-		username, usernameExists := keyValue["username"]
-		password, passwordExists := keyValue["password"]
-		if !usernameExists || !passwordExists || username == "" || password == "" {
+		tempUsername, usernameExists := keyValue["username"]
+		tempPassword, passwordExists := keyValue["password"]
+		if !usernameExists || !passwordExists || tempUsername == "" || tempPassword == "" {
 			log.Fatalf("Username or password not found or empty in secret")
 		}
+		username = tempUsername
+		password = tempPassword
+	}
+
+	if anonymousAccess {
+		log.Println("Running in anonymous mode")
+	} else {
+		log.Println("Running in authenticated mode")
 	}
 
 	return sess

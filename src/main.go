@@ -76,6 +76,26 @@ func refreshAuthTokens() {
 	}
 }
 
+func basicAuthMiddleware(next http.Handler) http.Handler {
+	if anonymousAccess {
+		return next
+	}
+
+	if username == "" || password == "" {
+		log.Fatal("Username and password must be set if anonymous access is not allowed")
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		if !ok || u != username || p != password {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	session := unmarshallConfig()
 	codeArtifactClient = codeartifact.New(session)
@@ -106,8 +126,10 @@ func main() {
 		_, _ = w.Write([]byte(`{"status": "ok", "message": "Service is running"}`))
 	})
 
+	proxyHandler := http.HandlerFunc(ProxyRequestHandler)
+	http.Handle("/", basicAuthMiddleware(proxyHandler))
+
 	fmt.Println("Starting server on port:", port)
-	http.HandleFunc("/", ProxyRequestHandler)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	if err != nil {
 		log.Fatal(err)

@@ -8,9 +8,7 @@ resource "aws_lb" "this" {
   security_groups    = local.security_groups
   subnets            = var.networking.subnets
 
-  tags = merge({
-    Name = var.names.load_balancer_prefix
-  }, coalesce(var.tags.load_balancer, {}))
+  tags  = merge(var.default_tags, var.tags.load_balancer)
 
   depends_on = [aws_security_group.sg]
 }
@@ -39,9 +37,8 @@ resource "aws_lb_target_group" "this" {
     unhealthy_threshold = var.networking.health_check.unhealthy_threshold
   }
 
-  tags = merge({
-    Name = var.names.load_balancer_prefix
-  }, coalesce(var.tags.load_balancer_target_group, {}))
+  tags  = merge(var.default_tags, var.tags.cluster)
+
 
   depends_on = [aws_lb.this]
 }
