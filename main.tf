@@ -1,7 +1,7 @@
 
 locals {
   # DO NOT EDIT
-  TRACKED_GIT_VERSION = "0.1.27"
+  TRACKED_GIT_VERSION = "0.1.28"
   image_name              = "codeartifact-proxy"
   image_repository        = "kassett247"
 }
